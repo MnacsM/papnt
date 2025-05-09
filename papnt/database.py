@@ -1,5 +1,5 @@
-from typing import Literal, Optional, Dict, List
 from pathlib import Path
+from typing import Dict, List, Literal, Optional
 
 from notion_client import Client
 

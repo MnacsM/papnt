@@ -1,17 +1,16 @@
-import requests
 from pathlib import Path
 
-from bibtexparser.bwriter import BibTexWriter
+import requests
 from bibtexparser.bibdatabase import BibDatabase
+from bibtexparser.bwriter import BibTexWriter
 
-from .misc import load_config, FailLogger
-from .database import Database
 from .abbrlister import AbbrLister
-from .pdf2doi import pdf_to_doi
+from .database import Database
+from .misc import FailLogger, load_config
 from .notionprop import NotionPropMaker, to_notionprop
-from .prop2entry import notionprop_to_entry
+from .pdf2doi import pdf_to_doi
 from .pdf2text import PDF2ChildrenConverter
-
+from .prop2entry import notionprop_to_entry
 
 DEBUGMODE = False
 converter = PDF2ChildrenConverter(
@@ -78,6 +77,32 @@ def update_unchecked_records_from_doi(database: Database, propnames: dict):
         _update_record_from_doi(database, doi, record['id'], propnames)
 
 
+def _update_record_from_doi_jalc(
+        database: Database, doi: str, id_record: str, propnames: dict):
+
+    prop_maker = NotionPropMaker()
+    prop = prop_maker.from_doi_jalc(doi, propnames)
+    prop |= {'info': {'checkbox': True}}
+    try:
+        database.update_properties(id_record, prop)
+        for note in prop_maker.notes:
+            database.add_children(id_record, note, 'paragraph')
+
+    except Exception as e:
+        print(str(e))
+        name = prop['Name']['title'][0]['text']['content']
+        raise ValueError(f'Error while updating record: {name}')
+
+
+def update_unchecked_records_from_doi_jalc(database: Database, propnames: dict):
+    filter = {
+        'and': [{'property': 'info', 'checkbox': {'equals': False}},
+                {'property': 'DOI', 'rich_text': {'is_not_empty': True}}]}
+    for record in database.fetch_records(filter).db_results:
+        doi = record['properties']['DOI']['rich_text'][0]['plain_text']
+        _update_record_from_doi_jalc(database, doi, record['id'], propnames)
+
+
 def update_unchecked_records_from_uploadedpdf(
         database: Database, propnames: dict):
     PATH_TEMP_PDF = Path('you-can-delete-this-file.pdf')
@@ -125,8 +150,8 @@ def make_abbrjson_from_bibpath(input_bibpath: str, special_abbr: dict):
 
 
 if __name__ == '__main__':
-    from .misc import load_config
     from .database import DatabaseInfo
+    from .misc import load_config
 
     config = load_config(Path(__file__).parent / 'config.ini')
     database = Database(DatabaseInfo())

@@ -1,11 +1,13 @@
-from typing import Optional, Any, Literal, List
+import datetime
 import string
+from typing import Any, List, Literal, Optional
+
+import arxiv
+import requests
+from crossref.restful import Works
 from unidecode import unidecode
 
-from crossref.restful import Works
-import arxiv
-
-from .const import SKIPWORDS, CROSSREF_TO_BIB
+from .const import CROSSREF_TO_BIB, SKIPWORDS
 
 
 def to_notionprop(content: Optional[Any],
@@ -68,6 +70,10 @@ class NotionPropMaker:
             doi_style_info = self._fetch_info_from_doi(doi)
         return self._make_properties(doi_style_info, propnames)
 
+    def from_doi_jalc(self, doi: str, propnames: dict) -> dict:
+        doi_style_info = self._fetch_info_from_doi_jalc(doi)
+        return self._make_properties(doi_style_info, propnames)
+
     def _fetch_info_from_arxiv(self, doi: str) -> dict:
         doi = doi.replace('//', '/')
         arxiv_id = doi.split('arXiv.')[1]
@@ -78,7 +84,7 @@ class NotionPropMaker:
             authors.append({
                 'given': ' '.join(author.name.split(' ')[:-1]),
                 'family': author.name.split(' ')[-1]})
-        
+
         date = paper.published
         return {
             'author': authors,
@@ -92,9 +98,98 @@ class NotionPropMaker:
         doi = doi.replace('//', '/')
         works = Works()
         info = works.doi(doi)
+
         if info is None:
             raise Exception(f'Extracted DOI ({doi}) was not found.')
         return works.doi(doi)
+
+    def _fetch_info_from_doi_jalc(self, doi: str) -> dict:        
+        url = f"https://api.japanlinkcenter.org/dois/{doi}"
+        headers = {"Accept": "application/json"}
+
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise Exception(f"JaLC API request failed: {response.status_code}")
+
+        data = response.json()
+        meta = data.get("data", {})
+
+        # タイトル（日本語 or 英語）
+        title_list = meta.get("title_list", [])
+        title = next((t["title"] for t in title_list if t["lang"] == "ja"), None)
+        if title is None:
+            title = next((t["title"] for t in title_list if t["lang"] == "en"), None)
+
+        # 著者リスト（日本語または英語から取得）
+        author = []
+        for person in meta.get("creator_list", []):
+            name_obj = next((n for n in person.get("names", []) if n["lang"] == "ja"), None)
+            if not name_obj:
+                name_obj = next((n for n in person.get("names", []) if n["lang"] == "en"), None)
+            if name_obj:
+                author.append({
+                    "given": name_obj.get("first_name"),
+                    "family": name_obj.get("last_name")
+                })
+
+        published = None
+        if "date" in meta:
+            try:
+                dt = datetime.datetime.strptime(meta["date"], "%Y-%m-%d")
+                published = {"date-parts": [[dt.year, dt.month, dt.day]]}
+            except ValueError:
+                pass
+
+        # ジャーナル名（日本語優先）
+        journal_list = meta.get("journal_title_name_list", [])
+        container = next((j["journal_title_name"] for j in journal_list if j["lang"] == "ja" and j["type"] == "full"), None)
+        if container is None:
+            container = next((j["journal_title_name"] for j in journal_list if j["lang"] == "en" and j["type"] == "full"), None)
+
+        # 出版社（日本語優先）
+        pub_list = meta.get("publisher_list", [])
+        publisher = next((p["publisher_name"] for p in pub_list if p["lang"] == "ja"), None)
+        if publisher is None:
+            publisher = next((p["publisher_name"] for p in pub_list if p["lang"] == "en"), None)
+
+        # ページ番号
+        first_page = meta.get("first_page")
+        last_page = meta.get("last_page")
+        page = None
+        if first_page and last_page:
+            page = f"{first_page}–{last_page}"
+        elif first_page:
+            page = first_page
+
+        # JaLCの article_type → Crossref 準拠の型にマッピング
+        article_type_map = {
+            "pub": "journal-article",
+            "dataset": "dataset",
+            "book": "book",
+            "conference-paper": "proceedings-article",
+            "poster": "posted-content"
+            # 必要なら追加
+        }
+        raw_type = meta.get("article_type")
+        cr_type = article_type_map.get(raw_type, "article")  # fallback: "article"
+
+        # フォーマット整形
+        info = {
+            "DOI": doi,
+            "title": [title] if title else [],
+            "author": [{'given': 'Kong', 'family': 'Joo'}],  # author,
+            "published": published,  # {"date-parts": [[year]]} if year else None,
+            "container-title": [container] if container else [],
+            "publisher": publisher,
+            "volume": meta.get("volume"),
+            "issue": meta.get("issue"),
+            "page": page,
+            "type": cr_type,
+            "_source": "jalc"
+        }
+        info = {k: v for k, v in info.items() if v is not None}
+
+        return info
 
     def _make_citekey(self, lastname, title, year):
         # from [extensions.zotero.translators.better-bibtex.skipWords], zotero.

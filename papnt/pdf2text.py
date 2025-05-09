@@ -1,15 +1,14 @@
-from typing import List
-from copy import deepcopy
 import re
-from time import sleep
+from copy import deepcopy
 from pathlib import Path
+from time import sleep
+from typing import List
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag
-
-from .misc import load_config
 from grobid_client.grobid_client import GrobidClient
 
+from .misc import load_config
 
 TEIURL = r'http://www.tei-c.org/ns/1.0'
 
