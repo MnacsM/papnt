@@ -1,8 +1,10 @@
+import os
 from pathlib import Path
 
 import requests
 from bibtexparser.bibdatabase import BibDatabase
 from bibtexparser.bwriter import BibTexWriter
+from dotenv import load_dotenv
 
 from .abbrlister import AbbrLister
 from .database import Database
@@ -154,6 +156,11 @@ if __name__ == '__main__':
     from .misc import load_config
 
     config = load_config(Path(__file__).parent / 'config.ini')
+    load_dotenv(Path(__file__).parent / '.env')
+    config['database']['tokenkey'] = os.getenv('TOKEN_KEY')
+    config['database']['database_id'] = os.getenv('DATABASE_ID')
+    config['misc']['dir_save_bib'] = os.getenv('DIR_SAVE_BIB')
+
     database = Database(DatabaseInfo())
 
     add_records_from_local_pdfpath(

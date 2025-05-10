@@ -1,17 +1,23 @@
+import os
 from pathlib import Path
 from typing import Dict, List, Literal, Optional
 
+from dotenv import load_dotenv
 from notion_client import Client
 
-from .misc import load_config
+# from .misc import load_config
 
 
 class DatabaseInfo:
     def __init__(self, path_config: Optional[str | Path]=None):
-        path_config = path_config or (Path(__file__).parent / 'config.ini')
-        config = load_config(path_config)
-        self.tokenkey = config['database']['tokenkey']
-        self.database_id = config['database']['database_id']
+        # path_config = path_config or (Path(__file__).parent / 'config.ini')
+        # config = load_config(path_config)
+        # self.tokenkey = config['database']['tokenkey']
+        # self.database_id = config['database']['database_id']
+
+        load_dotenv(Path(__file__).parent / '.env')
+        self.tokenkey = os.getenv('TOKEN_KEY')
+        self.database_id = os.getenv('DATABASE_ID')
 
 
 class Database:

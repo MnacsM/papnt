@@ -107,12 +107,21 @@ class NotionPropMaker:
         url = f"https://api.japanlinkcenter.org/dois/{doi}"
         headers = {"Accept": "application/json"}
 
-        response = requests.get(url, headers=headers)
-        if response.status_code != 200:
-            raise Exception(f"JaLC API request failed: {response.status_code}")
+        try:
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()  # HTTPエラーを例外にする
+        except requests.exceptions.HTTPError as e:
+            raise Exception(f"JaLC API HTTP error for DOI '{doi}': {e}")
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"JaLC API connection error: {e}")
 
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError:
+            raise Exception(f"JaLC API returned invalid JSON for DOI '{doi}'.")
         meta = data.get("data", {})
+        if not meta:
+            raise Exception(f"No metadata found in JaLC response for DOI '{doi}'.")
 
         # タイトル（日本語 or 英語）
         title_list = meta.get("title_list", [])
@@ -177,7 +186,7 @@ class NotionPropMaker:
         info = {
             "DOI": doi,
             "title": [title] if title else [],
-            "author": [{'given': 'Kong', 'family': 'Joo'}],  # author,
+            "author": author,
             "published": published,  # {"date-parts": [[year]]} if year else None,
             "container-title": [container] if container else [],
             "publisher": publisher,
