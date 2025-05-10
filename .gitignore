@@ -2,3 +2,10 @@
 */__pycache__/*
 papnt.egg-info/*
 PRIVATE
+
+build/
+.python-version
+pyproject.toml
+uv.lock
+bibfiles/
+.env
