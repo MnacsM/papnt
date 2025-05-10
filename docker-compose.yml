@@ -1,0 +1,12 @@
+services:
+  papnt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: papnt:latest
+    volumes:
+      - ./config:/app/config
+      - ./bibfiles:/app/bibfiles
+    working_dir: /app
+    tty: true
+    stdin_open: true
