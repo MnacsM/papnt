@@ -1,6 +1,8 @@
+import os
 from pathlib import Path
 
 import click
+from dotenv import load_dotenv
 
 from .database import Database, DatabaseInfo
 from .mainfunc import (add_records_from_local_pdfpath,
@@ -13,6 +15,10 @@ from .misc import load_config
 
 global config, database
 config = load_config(Path(__file__).parent / 'config.ini')
+load_dotenv(Path(__file__).parent / '.env')
+config['database']['tokenkey'] = os.getenv('TOKEN_KEY')
+config['database']['database_id'] = os.getenv('DATABASE_ID')
+config['misc']['dir_save_bib'] = os.getenv('DIR_SAVE_BIB')
 database = Database(DatabaseInfo())
 
 
