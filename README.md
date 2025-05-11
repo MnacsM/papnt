@@ -11,13 +11,13 @@ from https://github.com/issakuss/papnt
 - ビルド（初回のみ）
 
 ```shell
-docker-compose build
+docker compose build
 ```
 
 - 実行（シェル起動）
 
 ```shell
-docker-compose run --rm papnt
+docker compose run --rm papnt
 ```
 
 ## papnt usage
@@ -32,6 +32,12 @@ papnt doi
 
 ```shell
 papnt jalc
+```
+
+- データベースに記入されたbibをもとに情報を埋める
+
+```shell
+papnt bib
 ```
 
 - データベースにアップロードされたPDFファイルをもとに，情報を埋める
