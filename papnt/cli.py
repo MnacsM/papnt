@@ -6,6 +6,7 @@ from .database import Database, DatabaseInfo
 from .mainfunc import (add_records_from_local_pdfpath,
                        make_abbrjson_from_bibpath, make_bibfile_from_records,
                        update_unchecked_records_from_doi,
+                       update_unchecked_records_from_doi_bib,
                        update_unchecked_records_from_doi_jalc,
                        update_unchecked_records_from_uploadedpdf)
 from .misc import load_config
@@ -61,6 +62,13 @@ def jalc():
     """Fill information in record(s) by DOI (JaLC API)"""
     if _config_is_ok():
         update_unchecked_records_from_doi_jalc(database, config['propnames'])
+
+
+@main.command()
+def bib():
+    """Fill information in record(s) from bibfile"""
+    if _config_is_ok():
+        update_unchecked_records_from_bib(database, config['propnames'])
 
 
 @main.command()

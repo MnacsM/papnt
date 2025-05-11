@@ -105,6 +105,32 @@ def update_unchecked_records_from_doi_jalc(database: Database, propnames: dict):
         _update_record_from_doi_jalc(database, doi, record['id'], propnames)
 
 
+def _update_record_from_bib(
+        database: Database, bibtex_str: str, id_record: str, propnames: dict):
+
+    prop_maker = NotionPropMaker()
+    prop = prop_maker.from_bib(bibtex_str, propnames)
+    prop |= {'info': {'checkbox': True}}
+    try:
+        database.update_properties(id_record, prop)
+        for note in prop_maker.notes:
+            database.add_children(id_record, note, 'paragraph')
+
+    except Exception as e:
+        print(str(e))
+        name = prop['Name']['title'][0]['text']['content']
+        raise ValueError(f'Error while updating record: {name}')
+
+
+def update_unchecked_records_from_bib(database: Database, propnames: dict):
+    filter = {
+        'and': [{'property': 'info', 'checkbox': {'equals': False}},
+                {'property': 'bibtex', 'rich_text': {'is_not_empty': True}}]}
+    for record in database.fetch_records(filter).db_results:
+        bibtex_str = record['properties']['bibtex']['rich_text'][0]['plain_text']
+        _update_record_from_bib(database, bibtex_str, record['id'], propnames)
+
+
 def update_unchecked_records_from_uploadedpdf(
         database: Database, propnames: dict):
     PATH_TEMP_PDF = Path('you-can-delete-this-file.pdf')

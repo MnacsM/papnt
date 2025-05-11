@@ -1,4 +1,5 @@
 import datetime
+import re
 import string
 from typing import Any, List, Literal, Optional
 
@@ -74,6 +75,11 @@ class NotionPropMaker:
         doi_style_info = self._fetch_info_from_doi_jalc(doi)
         return self._make_properties(doi_style_info, propnames)
 
+    def from_bib(self, bibtex_str: str, propnames: dict) -> dict:
+        doi_style_info = self._fetch_info_from_bib(bibtex_str)
+        print(doi_style_info)
+        return self._make_properties(doi_style_info, propnames)
+
     def _fetch_info_from_arxiv(self, doi: str) -> dict:
         doi = doi.replace('//', '/')
         arxiv_id = doi.split('arXiv.')[1]
@@ -103,7 +109,7 @@ class NotionPropMaker:
             raise Exception(f'Extracted DOI ({doi}) was not found.')
         return works.doi(doi)
 
-    def _fetch_info_from_doi_jalc(self, doi: str) -> dict:        
+    def _fetch_info_from_doi_jalc(self, doi: str) -> dict:
         url = f"https://api.japanlinkcenter.org/dois/{doi}"
         headers = {"Accept": "application/json"}
 
@@ -137,8 +143,8 @@ class NotionPropMaker:
                 name_obj = next((n for n in person.get("names", []) if n["lang"] == "en"), None)
             if name_obj:
                 author.append({
-                    "given": name_obj.get("first_name"),
-                    "family": name_obj.get("last_name")
+                    "family": name_obj.get("first_name"),
+                    "given": name_obj.get("last_name")
                 })
 
         published = None
@@ -199,6 +205,78 @@ class NotionPropMaker:
         info = {k: v for k, v in info.items() if v is not None}
 
         return info
+
+    def _fetch_info_from_bib(self, bibtex_str: str) -> dict:
+        # エントリタイプと citekey 抽出
+        match = re.match(r"@(\w+)\s*{\s*([^,]+),", bibtex_str)
+        entry_type = match.group(1).lower() if match else "misc"
+
+        # フィールド抽出
+        fields = {}
+        for field in [
+            "author", "editor", "title", "year", "month",
+            "journal", "booktitle", "pages", "volume",
+            "number", "publisher", "doi", "url"
+        ]:
+            pattern = rf"{field}\s*=\s*[{{\"](.*?)[}}\"],?"
+            match = re.search(pattern, bibtex_str, re.IGNORECASE | re.DOTALL)
+            if match:
+                fields[field.lower()] = match.group(1).strip()
+
+        # 著者リストの整形
+        def parse_authors(auth_str):
+            author_list = []
+            for name in auth_str.split("and"):
+                parts = name.strip().split()
+                if len(parts) >= 2:
+                    given = " ".join(parts[:-1])
+                    family = parts[-1]
+                else:
+                    family, given = parts[0], ""
+                author_list.append({"given": given, "family": family})
+            return author_list
+
+        # 年・月の処理
+        year = int(fields["year"]) if "year" in fields and fields["year"].isdigit() else None
+        month = fields.get("month", "").strip().lower()
+
+        # 月を数値に変換（Jan, February などに対応）
+        def parse_month(month_str):
+            if not month_str:
+                return None
+            try:
+                return int(month_str)
+            except ValueError:
+                try:
+                    return list(calendar.month_abbr).index(month_str[:3].capitalize())
+                except ValueError:
+                    try:
+                        return list(calendar.month_name).index(month_str.capitalize())
+                    except ValueError:
+                        return None
+
+        month_num = parse_month(month)
+        date_parts = [year] if year else []
+        if year and month_num:
+            date_parts.append(month_num)
+
+        # 統合した info 辞書を返す
+        info = {
+            "type": entry_type,
+            "author": parse_authors(fields.get("author", "")) if "author" in fields else [],
+            "editor": parse_authors(fields["editor"]) if "editor" in fields else [],
+            "title": [fields["title"]] if "title" in fields else [],
+            "published": {"date-parts": [date_parts]} if date_parts else None,
+            "container-title": [fields.get("journal") or fields.get("booktitle")] if "journal" in fields or "booktitle" in fields else [],
+            "page": fields.get("pages"),
+            "volume": fields.get("volume"),
+            "issue": fields.get("number"),
+            "publisher": fields.get("publisher"),
+            "DOI": fields.get("doi") or fields.get("url") or "",
+            "_source": "bibtex"
+        }
+
+        return {k: v for k, v in info.items() if v is not None}
 
     def _make_citekey(self, lastname, title, year):
         # from [extensions.zotero.translators.better-bibtex.skipWords], zotero.
