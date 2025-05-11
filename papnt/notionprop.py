@@ -210,6 +210,14 @@ class NotionPropMaker:
         # エントリタイプと citekey 抽出
         match = re.match(r"@(\w+)\s*{\s*([^,]+),", bibtex_str)
         entry_type = match.group(1).lower() if match else "misc"
+        BIB_TO_CROSSREF = {
+            # かなり無駄な処理
+            'article': 'journal-article',
+            'book': 'book',
+            'inbook': 'book-chapter',
+            'inproceedings': 'proceedings-article',
+        }
+        crossref_type = BIB_TO_CROSSREF.get(entry_type, "journal-article")
 
         # フィールド抽出
         fields = {}
@@ -262,7 +270,7 @@ class NotionPropMaker:
 
         # 統合した info 辞書を返す
         info = {
-            "type": entry_type,
+            "type": crossref_type,
             "author": parse_authors(fields.get("author", "")) if "author" in fields else [],
             "editor": parse_authors(fields["editor"]) if "editor" in fields else [],
             "title": [fields["title"]] if "title" in fields else [],
