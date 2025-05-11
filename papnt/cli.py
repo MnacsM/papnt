@@ -5,8 +5,8 @@ import click
 from .database import Database, DatabaseInfo
 from .mainfunc import (add_records_from_local_pdfpath,
                        make_abbrjson_from_bibpath, make_bibfile_from_records,
+                       update_unchecked_records_from_bib,
                        update_unchecked_records_from_doi,
-                       update_unchecked_records_from_doi_bib,
                        update_unchecked_records_from_doi_jalc,
                        update_unchecked_records_from_uploadedpdf)
 from .misc import load_config
